@@ -47,13 +47,13 @@ upstream.on("open", () => {
           prompt: "",
           language: "hi"
         },
-        turn_detection: {
-          type: "server_vad",
-          threshold: 0.5,
-          prefix_padding_ms: 300,
-          silence_duration_ms: 500,
-          // create_response: true,
-        },
+        // turn_detection: {
+        //   type: "server_vad",
+        //   threshold: 0.5,
+        //   prefix_padding_ms: 300,
+        //   silence_duration_ms: 500,
+        //   // create_response: true,
+        // },
         input_audio_noise_reduction: {
           type: "near_field"
         },
