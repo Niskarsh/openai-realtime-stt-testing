@@ -5,6 +5,9 @@ dotenv.config();
 const OPENAI_KEY = process.env.OPENAI_API_KEY;
 if (!OPENAI_KEY) throw new Error("Missing OPENAI_API_KEY");
 
+// 4️⃣ Expose your own WS on port 4000 and proxy audio
+const wss = new WebSocketServer({ port: 4000 });
+let clientConnected: WebSocket;
 // 1️⃣ Connect upstream to OpenAI Realtime STT
 const upstream = new WebSocket(
   "wss://api.openai.com/v1/realtime?intent=transcription",
@@ -27,9 +30,18 @@ upstream.on("message", (raw) => {
   }
   // pass through any transcription events to console
   if (msg.type.startsWith("conversation.item.input_audio_transcription")) {
-    console.log(msg);
+    // console.log(msg);
+    // write message to wss clients
+    // wss.clients.forEach((client) => {
+    //   if (client.readyState === WebSocket.OPEN) {
+    //     client.send(JSON.stringify(msg));
+    //   }
+    // });
+    if (clientConnected.readyState === WebSocket.OPEN) {
+      clientConnected.send(JSON.stringify(msg));
+    }
   }
-  // console.log(msg);
+  console.log(msg);
 });
 
 // 3️⃣ Update session to enable transcription (once ready)
@@ -45,18 +57,19 @@ upstream.on("open", () => {
         input_audio_transcription: {
           model: "gpt-4o-transcribe",
           prompt: "",
-          language: "hi"
+          language: "en"
         },
-        // turn_detection: {
-        //   type: "server_vad",
-        //   threshold: 0.5,
-        //   prefix_padding_ms: 300,
-        //   silence_duration_ms: 500,
-        //   // create_response: true,
+        turn_detection: {
+          type: "server_vad",
+          threshold: 0.7,
+          prefix_padding_ms: 200,
+          silence_duration_ms: 500,
+          // create_response: true,
+        },
+        // turn_detection: null,
+        // input_audio_noise_reduction: {
+        //   type: "near_field"
         // },
-        input_audio_noise_reduction: {
-          type: "near_field"
-        },
         // include: [
         //   "item.input_audio_transcription.logprobs",
         // ]
@@ -67,18 +80,15 @@ upstream.on("open", () => {
   };
   check();
 });
-
-// 4️⃣ Expose your own WS on port 4000 and proxy audio
-const wss = new WebSocketServer({ port: 4000 });
 wss.on("connection", (client) => {
   console.log("Client connected");
-
+  clientConnected = client;
   client.on("message", (audioChunk) => {
     if (!sessionId) return;  // guard
 
     // Base64‑encode raw PCM bytes
     const b64 = Buffer.from(audioChunk).toString("base64");
-
+    // console.log(`Data`, b64)
     // Append into the session buffer with the session ID
     upstream.send(
       JSON.stringify({
