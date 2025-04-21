@@ -1,14 +1,24 @@
 import WebSocket, { WebSocketServer } from 'ws';
+import express from 'express';
+import http from 'http';
 import dotenv from 'dotenv';
 dotenv.config();
 
+const PORT       = process.env.PORT ? parseInt(process.env.PORT, 10) : 4000;
+const HOST       = process.env.HOST || '127.0.0.1';
 const OPENAI_KEY = process.env.OPENAI_API_KEY;
-if (!OPENAI_KEY) throw new Error("Missing OPENAI_API_KEY");
+if (!OPENAI_KEY) throw new Error('Missing OPENAI_API_KEY');
+
+// 1️⃣  Express app with /health
+const app = express();
+app.get('/health', (_req, res) => res.status(200).send('ok'));
+const server = http.createServer(app);
+
 
 // 4️⃣ Expose your own WS on port 4000 and proxy audio
 const wss = new WebSocketServer({
-  port: process.env.PORT ? process.env.PORT: 4000,
-  host: process.env.HOST || '127.0.0.1',
+  server,
+  path: '/ws',
 });
 let clientConnected: WebSocket;
 // 1️⃣ Connect upstream to OpenAI Realtime STT
@@ -88,7 +98,6 @@ wss.on("connection", (client) => {
   clientConnected = client;
   client.on("message", (audioChunk) => {
     if (!sessionId) return;  // guard
-
     // Base64‑encode raw PCM bytes
     const b64 = Buffer.from(audioChunk).toString("base64");
     // console.log(`Data`, b64)
@@ -103,6 +112,13 @@ wss.on("connection", (client) => {
   });
 
   client.on("close", () => console.log("Client disconnected"));
+});
+
+// 4️⃣  Start HTTP & WS on the same port
+server.listen(PORT, HOST, () => {
+  console.log(`Server listening at http://${HOST}:${PORT}`);
+  console.log(`  • Health check:      GET http://${HOST}:${PORT}/health`);
+  console.log(`  • STT WebSocket      ws://${HOST}:${PORT}/ws`);
 });
 
 console.log("WebSocket proxy listening on ws://localhost:4000");
