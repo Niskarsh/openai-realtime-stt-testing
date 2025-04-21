@@ -6,7 +6,10 @@ const OPENAI_KEY = process.env.OPENAI_API_KEY;
 if (!OPENAI_KEY) throw new Error("Missing OPENAI_API_KEY");
 
 // 4️⃣ Expose your own WS on port 4000 and proxy audio
-const wss = new WebSocketServer({ port: 4000 });
+const wss = new WebSocketServer({
+  port: process.env.PORT ? process.env.PORT: 4000,
+  host: process.env.HOST || '127.0.0.1',
+});
 let clientConnected: WebSocket;
 // 1️⃣ Connect upstream to OpenAI Realtime STT
 const upstream = new WebSocket(
